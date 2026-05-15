@@ -69,13 +69,6 @@ We fine-tune-ready **audeering/wav2vec2-large-robust-24-ft-age-gender** (single 
 
 The service separates **fast I/O** (FastAPI + multipart/WebSocket ingestion, resampling to 16 kHz mono, light denoise) from **heavy inference** (Wav2Vec2 forward pass). For scale, the API optionally enqueues PCM WAV payloads to **Redis** via **arq**, letting stateless API pods autoscale independently of memory-hungry workers. Workers deserialize in RAM, reuse a single loaded model per process, and return structured JSON, which keeps tail latency predictable under burst telephony traffic. Audio quality is computed with cheap signal metrics (band-limited SNR proxy, clipping rate, VAD-weighted speech seconds) *before* trusting classifier confidences: when quality is `insufficient` or `degraded`, predictions are damped or marked `unknown`, which matches logistics scenarios (highway noise, GSM artifacts). Progressive WebSocket updates re-run inference on a growing buffer so confidence rises as more speech arrives—mirroring the bonus scenario. With more time, I would add ONNXRuntime batching, per-language heads, and a calibration layer (temperature scaling) fit on Common Voice; for 1k concurrent calls I would shard Redis queues by tenant, run HPA on workers with GPU node pools, cap upload duration server-side, and add back-pressure when queue depth exceeds SLO.
 
-## Bonus: evaluation harness
-
-```bash
-pip install datasets pandas tqdm torch torchaudio
-python scripts/eval_common_voice.py --limit 200 --language en
-```
-
 ## Known limitations
 
 - CPU inference on the large Wav2Vec2 model may exceed the 500 ms target for long clips; use GPU workers, shorter windows, or ONNX for stricter SLOs.
