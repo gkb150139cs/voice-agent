@@ -1,0 +1,53 @@
+services:
+  redis:
+    image: redis:7-alpine
+    # No host port: avoids conflicts with local Redis/other services. API/worker reach Redis on the compose network only.
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - example.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      HOST: 0.0.0.0
+      PORT: "8000"
+      USE_INFERENCE_WORKER: "true"
+      INFERENCE_MODE: worker
+      HF_HOME: /cache/huggingface
+      TRANSFORMERS_CACHE: /cache/huggingface
+    volumes:
+      - hf_cache:/cache/huggingface
+    depends_on:
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  worker:
+    build: .
+    env_file:
+      - example.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      INFERENCE_MODE: local
+      TORCH_DEVICE: cpu
+      HF_HOME: /cache/huggingface
+      TRANSFORMERS_CACHE: /cache/huggingface
+    volumes:
+      - hf_cache:/cache/huggingface
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "arq", "app.worker.WorkerSettings"]
+
+volumes:
+  hf_cache:
