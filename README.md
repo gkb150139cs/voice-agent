@@ -38,7 +38,7 @@ Redis is **not** published to the host (only `api` port **8000** is), so it neve
 Generate a sample clip:
 
 ```bash
-python samples/generate_tone.py
+python3 samples/generate_tone.py
 curl -sS -X POST "http://localhost:8000/analyze" \
   -F "audio=@samples/tone.wav;type=audio/wav" \
   -F "codec=wav" \
